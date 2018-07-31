@@ -9,35 +9,117 @@ response=read.csv(file="Data/MedicaidResponseData.csv")
 head(response)
 
 response.clean=response%>%
-  dplyr::select(state.postal,state.fips,year,state.year,expansion,expansion.delay,expansion.early,research.funds,nfib.support,king.support,authorize,waiver.expansion,nfib.challenge,king.challenge,grant.returns,Active.Waiver,mandate.challenge,leg.challenge,compact,leg.lit,fund.return,repeal)
-
-names(response.clean)
+  dplyr::select(state.postal,state.fips,year,state.year,expansion,expansion.delay,expansion.early,research.funds,nfib.support,king.support,authorize,waiver.expansion,nfib.challenge,king.challenge,grant.returns,Active.Waiver,mandate.challenge,leg.challenge,compact,leg.lit,fund.return,repeal,funding.cuts)
 
 ########adding in grants
 grants=read.csv("data/grantdata.csv")
+head(grants)
 grants=grants%>%
   dplyr::filter(date>2010)%>%
   dplyr::select(state.year,planning,level.1,level.2,innovator,grant.total,grant.weighted)
+
 response.working=full_join(response.clean,grants)
+response.working=response.working%>%  
+  mutate(planning=if_else(is.na(as.numeric(planning)),0,as.numeric(planning)))%>%
+  mutate(level.1=if_else(is.na(as.numeric(level.1)),0,as.numeric(level.1)))%>%
+  mutate(level.2=if_else(is.na(as.numeric(level.2)),0,as.numeric(level.2)))%>%
+  mutate(innovator=if_else(is.na(as.numeric(innovator)),0,as.numeric(innovator)))%>%
+  mutate(grant.total=if_else(is.na(as.numeric(grant.total)),0,as.numeric(grant.total)))%>%
+  mutate(grant.weighted=if_else(is.na(as.numeric(grant.weighted)),0,as.numeric(grant.weighted)))
+head(response.working)
 
 
+######################################Producing our DV's#########################
 #########Positive##########
-#Expansion - 1 = 20, 0 = 0 #weighted.grants - stays same, #nfib.support - +5 #king.support - +5, #+1 per authorize, stays same
-
+#Expansion - 1 = 20, 0 = 0 #grant.weighted - stays same, #nfib.support - +5 #king.support - +5, #+1 per authorize, stays same
 ####Negative#######
 #nfib.challenge, #king.challenge - -5, #grant.returns, -grant totals*2
 #delay, -3 per year
 #-2 for delay legislation (funding.cuts, leg.challenge, compacts, fund.return)
 #-5 for rejection legislation (mandate.challenge, leg.lit, repeal)
 #waiver.expansion, -10
-names(response.clean)
-unique(response.clean$weighted.grants)
-working=response.clean%>%
-  mutate(response.weighted.non=(nfib.challenge*-5)+
-           (king.challenge*-5)+
+summary(response.working)
+response.dvs=response.working%>%
+  mutate(nonexpanse.weighted=grant.weighted+
            (nfib.support*5)+
            (king.support*5)+
-           (weighted.grants))
+           (authorize)+
+           (nfib.challenge*-5)+
+           (king.challenge*-5)+
+           (grant.returns)+
+           (expansion.delay)+
+           (funding.cuts*-2)+
+           (leg.challenge*-2)+
+           (compact*-2)+
+           (fund.return*-2)+
+           (mandate.challenge*-5)+
+           (leg.lit*-5)+
+           (repeal*-5)+
+           (waiver.expansion*-10))%>%
+  mutate(response.weighted=grant.weighted+
+           (nfib.support*5)+
+           (king.support*5)+
+           (authorize)+
+           (nfib.challenge*-5)+
+           (king.challenge*-5)+
+           (grant.returns)+
+           (expansion.delay)+
+           (funding.cuts*-2)+
+           (leg.challenge*-2)+
+           (compact*-2)+
+           (fund.return*-2)+
+           (mandate.challenge*-5)+
+           (leg.lit*-5)+
+           (repeal*-5)+
+           (waiver.expansion*-10)+
+           (expansion*20))%>%
+  mutate(nonexpanse.unweighted=grant.total+
+           (nfib.support)+
+           (king.support)+
+           (authorize)+
+           (nfib.challenge*-1)+
+           (king.challenge*-1)+
+           (if_else(grant.returns<0,-1,0))+
+           (if_else(expansion.delay<0,-1,0))+
+           (funding.cuts*-1)+
+           (leg.challenge*-1)+
+           (compact*-1)+
+           (fund.return*-1)+
+           (mandate.challenge*-1)+
+           (leg.lit*-1)+
+           (repeal*-1)+
+           (waiver.expansion*-1))%>%
+  mutate(response.unweighted=grant.weighted+
+           (nfib.support*5)+
+           (king.support*5)+
+           (authorize)+
+           (nfib.challenge*-5)+
+           (king.challenge*-5)+
+           (grant.returns)+
+           (expansion.delay)+
+           (funding.cuts*-2)+
+           (leg.challenge*-2)+
+           (compact*-2)+
+           (fund.return*-2)+
+           (mandate.challenge*-5)+
+           (leg.lit*-5)+
+           (repeal*-5)+
+           (waiver.expansion*-10)+
+           (expansion*5))
+summary(response.dvs$nonexpanse.unweighted[which(response.dvs$expansion==1)])
+response.dvs[which(response.dvs$expansion==1 & response.dvs$nonexpanse.unweighted < -1),]
+response.dvs[which(response.dvs$expansion==1 & response.dvs$nonexpanse.weighted < -15),]
+
+##############Plotting my DV's
+cor.test(response.dvs$response.unweighted,response.dvs$response.weighted)
+cor.test(response.dvs$nonexpanse.weighted,response.dvs$nonexpanse.unweighted)
+plot(response.dvs$response.unweighted,response.dvs$response.weighted)
+
+####other DV's
+response.dvs=response.dvs%>%
+  mutate(litigation=nfib.support+nfib.challenge+king.support+king.challenge)%>%
+  mutate(anti.legislation=)
+
 ################Attaching Shor Data
 shor.data=read.dta13("/Users/eringutbrod/Projects/Resources/Datahub/Shor_data/2018 Update/shor mccarty 1993-2016 state aggregate data May 2018 release (Updated July 2018).dta")
 head(shor.data)
