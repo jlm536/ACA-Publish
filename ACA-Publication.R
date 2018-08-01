@@ -2,13 +2,15 @@
 source("/Users/eringutbrod/Projects/Resources/Code/R/FunctionList.R")
 library(foreign)
 library(readstata13)
-
+library(psych)
+library(GPArotation)
 ####################Reading in data##########################################
 ############Reading in State Response Data
 response=read.csv(file="Data/MedicaidResponseData.csv")
-head(response)
+summary(response)
 
 response.clean=response%>%
+  mutate(expansion=if_else(is.na(as.numeric(expansion)),0,as.numeric(expansion)))%>%
   dplyr::select(state.postal,state.fips,year,state.year,expansion,expansion.delay,expansion.early,research.funds,nfib.support,king.support,authorize,waiver.expansion,nfib.challenge,king.challenge,grant.returns,Active.Waiver,mandate.challenge,leg.challenge,compact,leg.lit,fund.return,repeal,funding.cuts)
 
 ########adding in grants
@@ -116,10 +118,46 @@ cor.test(response.dvs$nonexpanse.weighted,response.dvs$nonexpanse.unweighted)
 plot(response.dvs$response.unweighted,response.dvs$response.weighted)
 
 ####other DV's
-response.dvs=response.dvs%>%
-  mutate(litigation=nfib.support+nfib.challenge+king.support+king.challenge)%>%
-  mutate(anti.legislation=)
+dvs=response.dvs%>%
+  mutate(litigation=nfib.support-nfib.challenge+king.support-king.challenge)%>%
+  mutate(anti.legislation=funding.cuts+leg.challenge+compact+fund.return+mandate.challenge+leg.lit+repeal)%>%
+  select(state.year,response.unweighted,response.weighted,nonexpanse.unweighted,nonexpanse.weighted,expansion,litigation,anti.legislation,authorize,grant.weighted)
+
+head(dvs)
+
+####################Attempting a PCA
+head(response.working)
+pca.data=response.working%>%
+  dplyr::select(state.year,grant.weighted,expansion,expansion.delay,nfib.support,king.support,authorize,waiver.expansion,nfib.challenge,king.challenge,grant.returns,mandate.challenge,leg.challenge,compact,leg.lit,fund.return,repeal,funding.cuts,grant.total)%>%
+  mutate(litigation=nfib.support-nfib.challenge+king.support-king.challenge)%>%
+  mutate(anti.legislation=-1*(funding.cuts+leg.challenge+compact+fund.return+mandate.challenge+leg.lit+repeal))%>%
+  dplyr::select(expansion,authorize,litigation,anti.legislation,grant.weighted,grant.returns)
+summary(pca.data)
+fit <- princomp(expansion+authorize+litigation+anti.legislation+grant.total+grant.returns, data=pca.data, cor=TRUE)
+summary(fit) # print variance accounted for 
+loadings(fit) # pc loadings 
+plot(fit,type="lines") # scree plot 
+length(fit$scores) # the principal components
+dev.new()
+biplot(fit)
+  
+####################Attempting a PCA - 2-Use This One!
+parallel <- fa.parallel(pca.data, fm = 'wls', fa = 'fa')
+threefactor <- fa(pca.data,nfactors = 2,rotate = "oblimin",fm="wls")
+print(threefactor)
+print(threefactor$loadings,cutoff = 0.3)
+plot(threefactor)
+fa.diagram(threefactor)
+
+fit <- principal(pca.data, nfactors=2, rotate="oblimin")
+fit # print results
+print(fit$loadings,cutoff = 0.3)
+plot(fit)
+
+
 
 ################Attaching Shor Data
+head(dvs)
+
 shor.data=read.dta13("/Users/eringutbrod/Projects/Resources/Datahub/Shor_data/2018 Update/shor mccarty 1993-2016 state aggregate data May 2018 release (Updated July 2018).dta")
 head(shor.data)
