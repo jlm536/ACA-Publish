@@ -121,7 +121,7 @@ plot(response.dvs$response.unweighted,response.dvs$response.weighted)
 dvs=response.dvs%>%
   mutate(litigation=nfib.support-nfib.challenge+king.support-king.challenge)%>%
   mutate(anti.legislation=funding.cuts+leg.challenge+compact+fund.return+mandate.challenge+leg.lit+repeal)%>%
-  select(state.year,response.unweighted,response.weighted,nonexpanse.unweighted,nonexpanse.weighted,expansion,litigation,anti.legislation,authorize,grant.weighted)
+  select(state.postal,state.fips,year,state.year,response.unweighted,response.weighted,nonexpanse.unweighted,nonexpanse.weighted,expansion,litigation,anti.legislation,authorize,grant.weighted)
 
 head(dvs)
 
@@ -143,7 +143,7 @@ biplot(fit)
   
 ####################Attempting a PCA - 2-Use This One!
 parallel <- fa.parallel(pca.data, fm = 'wls', fa = 'fa')
-threefactor <- fa(pca.data,nfactors = 2,rotate = "oblimin",fm="wls")
+threefactor <- fa(pca.data,nfactors = 4,rotate = "oblimin",fm="wls")
 print(threefactor)
 print(threefactor$loadings,cutoff = 0.3)
 plot(threefactor)
@@ -151,13 +151,35 @@ fa.diagram(threefactor)
 
 fit <- principal(pca.data, nfactors=2, rotate="oblimin")
 fit # print results
-print(fit$loadings,cutoff = 0.3)
+print(fit$loadings,cutoff = 0.5)
 plot(fit)
-
+fa.diagram(fit)
 
 
 ################Attaching Shor Data
 head(dvs)
-
+unique(dvs$year)
 shor.data=read.dta13("/Users/eringutbrod/Projects/Resources/Datahub/Shor_data/2018 Update/shor mccarty 1993-2016 state aggregate data May 2018 release (Updated July 2018).dta")
 head(shor.data)
+shor.useful=shor.data%>%
+  filter(year>2010)%>%
+  mutate(state.year=paste(st,year,sep=""))%>%
+  dplyr::select(state.year,hou_chamber,hou_dem,hou_rep,hou_majority,sen_chamber,sen_dem,sen_rep,sen_majority)
+head(shor.useful)
+summary(shor.useful)
+shor.useful[which(is.na(shor.useful$hou_rep)),]
+shor.useful[which(is.na(shor.useful$sen_rep)),]
+dim(dvs)
+dim(shor.useful)
+dv.shor=full_join(dvs,shor.useful)
+head(dv.shor)
+unique(dv.shor$authorize[which(dv.shor$year>2010)])
+#########Attaching other IV's##############
+iv=read.csv("data/ACAIVData.csv")
+head(iv)
+iv=iv%>%
+  select(state.year,capita.income,fpl,no.insurance,operations.capita,health.donor.capita)
+dv.shor.iv=full_join(dv.shor,iv)
+head(dv.shor.iv)
+
+#########Attaching competition scores##########
