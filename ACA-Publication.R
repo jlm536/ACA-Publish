@@ -4,6 +4,100 @@ library(foreign)
 library(readstata13)
 library(psych)
 library(GPArotation)
+
+#############################################################################
+##############This is the space for actual modeling##########################
+#############################################################################
+df=read.csv("Data/workingdata.csv")
+head(df)
+df=df[,-1]
+
+####################Comparing DV's##########################
+##############Plotting my DV's
+cor.test(df$response.unweighted,df$response.weighted)
+cor.test(df$nonexpanse.weighted,df$nonexpanse.unweighted)
+plot(df$response.unweighted,df$response.weighted)
+#The results show that the unweighted and weighted scores are pretty comparable
+
+##############PCA analysis
+df.pca=read.csv("Data/workingdataFULL.csv")
+pca.data=df.pca%>%
+  dplyr::select(state.year,grant.weighted,expansion,expansion.delay,nfib.support,king.support,authorize,waiver.expansion,nfib.challenge,king.challenge,grant.returns,mandate.challenge,leg.challenge,compact,leg.lit,fund.return,repeal,funding.cuts,grant.total)%>%
+  mutate(litigation=nfib.support-nfib.challenge+king.support-king.challenge)%>%
+  mutate(anti.legislation=-1*(funding.cuts+leg.challenge+compact+fund.return+mandate.challenge+leg.lit+repeal))%>%
+  dplyr::select(expansion,authorize,litigation,anti.legislation,grant.weighted,grant.returns)
+
+fit <- principal(pca.data, nfactors=2, rotate="oblimin")
+fit # print results
+print(fit$loadings,cutoff = 0.3)
+plot(fit)
+fa.diagram(fit)
+##################The results show that the components load on two factors relatively clearly with positive action loading on factor 2 and expansion and negative action on factyor 1
+
+#########################Running some models##################################
+head(df)
+###########################Split Chamber Models######################
+chamber.shifts=lm(response.weighted~chamber.changes+hou_majority+hou_majority*chamber.changes+sen_majority+sen_majority*chamber.changes+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(chamber.shifts)###Clears NCV but only barely, high VIF but it still works
+##chamber shifts with weighted response is robus
+chamber.shifts.unweighted=lm(response.unweighted~chamber.changes+hou_majority+hou_majority*chamber.changes+sen_majority+sen_majority*chamber.changes+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(chamber.shifts.unweighted)###Clears NCV but only barely, high VIF but it still works
+##chamber shifts is not predictive
+
+effective.lm=lm(response.weighted~effective.party+hou_majority+hou_majority*effective.party+sen_majority+sen_majority*effective.party+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(effective.lm)###Clears NCV but only barely, high VIF but it still works
+##chamber shifts with weighted response is robus
+effective.lm.unweighted=lm(response.unweighted~effective.party+hou_majority+hou_majority*effective.party+sen_majority+sen_majority*effective.party+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(effective.lm.unweighted)###Clears NCV but only barely, high VIF but it still works
+##chamber shifts is not predictive
+
+pres.margin.lm=lm(response.weighted~pres.margin+hou_majority+hou_majority*pres.margin+sen_majority+sen_majority*pres.margin+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(pres.margin.lm)###Clears NCV but only barely, high VIF but it still works
+##chamber shifts with weighted response is robus
+pres.margin.lm.unweighted=lm(response.unweighted~pres.margin+hou_majority+hou_majority*pres.margin+sen_majority+sen_majority*pres.margin+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(pres.margin.lm.unweighted)###Clears NCV but only barely, high VIF but it still works
+##chamber shifts is not predictive
+
+competitionlee.lm=lm(response.weighted~competition.lee+hou_majority+hou_majority*competition.lee+sen_majority+sen_majority*competition.lee+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(competitionlee.lm)###Clears NCV but only barely, high VIF but it still works
+##chamber shifts with weighted response is robus
+competitionlee.lm.unweighted=lm(response.unweighted~competition.lee+hou_majority+hou_majority*competition.lee+sen_majority+sen_majority*competition.lee+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(competitionlee.lm.unweighted)###Clears NCV but only barely, high VIF but it still works
+##chamber shifts is not predictive
+
+###########################Majority Average Models######################
+df=df%>%
+  mutate(chamber.majorities=(hou_majority+sen_majority)/2)
+
+maj.chamber.shifts=lm(response.weighted~chamber.changes+chamber.majorities+chamber.majorities*chamber.changes+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.chamber.shifts)
+maj.chamber.shifts.robust =coeftest(maj.chamber.shifts, vcov = NeweyWest(maj.chamber.shifts,lag=1))
+print(maj.chamber.shifts.robust)
+
+maj.chamber.shifts.unweighted=lm(response.unweighted~chamber.changes+chamber.majorities+chamber.majorities*chamber.changes+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.chamber.shifts.unweighted)
+
+maj.effective=lm(response.weighted~effective.party+chamber.majorities+chamber.majorities*effective.party+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.effective)
+
+maj.effective.unweighted=lm(response.unweighted~effective.party+chamber.majorities+chamber.majorities*effective.party+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.effective.unweighted)
+
+maj.pres.margin=lm(response.weighted~pres.margin+chamber.majorities+chamber.majorities*pres.margin+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.pres.margin)
+
+maj.pres.margin.unweighted=lm(response.unweighted~pres.margin+chamber.majorities+chamber.majorities*pres.margin+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.pres.margin.unweighted)
+
+maj.competitionlee=lm(response.weighted~competition.lee+chamber.majorities+chamber.majorities*competition.lee+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.competitionlee)
+
+maj.competitionlee.unweighted=lm(response.unweighted~competition.lee+chamber.majorities+chamber.majorities*competition.lee+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.competitionlee.unweighted)
+
+#############################################################################
+##############This space reads in the data and puts it into one file##########################
+#############################################################################
 ####################Reading in data##########################################
 ############Reading in State Response Data
 response=read.csv(file="Data/MedicaidResponseData.csv")
@@ -121,7 +215,7 @@ plot(response.dvs$response.unweighted,response.dvs$response.weighted)
 dvs=response.dvs%>%
   mutate(litigation=nfib.support-nfib.challenge+king.support-king.challenge)%>%
   mutate(anti.legislation=funding.cuts+leg.challenge+compact+fund.return+mandate.challenge+leg.lit+repeal)%>%
-  select(state.postal,state.fips,year,state.year,response.unweighted,response.weighted,nonexpanse.unweighted,nonexpanse.weighted,expansion,litigation,anti.legislation,authorize,grant.weighted)
+  dplyr::select(state.postal,state.fips,year,state.year,response.unweighted,response.weighted,nonexpanse.unweighted,nonexpanse.weighted,expansion,litigation,anti.legislation,authorize,grant.weighted)
 
 head(dvs)
 
@@ -143,15 +237,15 @@ biplot(fit)
   
 ####################Attempting a PCA - 2-Use This One!
 parallel <- fa.parallel(pca.data, fm = 'wls', fa = 'fa')
-threefactor <- fa(pca.data,nfactors = 4,rotate = "oblimin",fm="wls")
+threefactor <- fa(pca.data,nfactors = 3,rotate = "oblimin",fm="wls")
 print(threefactor)
 print(threefactor$loadings,cutoff = 0.3)
 plot(threefactor)
 fa.diagram(threefactor)
 
-fit <- principal(pca.data, nfactors=2, rotate="oblimin")
+fit <- principal(pca.data, nfactors=3, rotate="oblimin")
 fit # print results
-print(fit$loadings,cutoff = 0.5)
+print(fit$loadings,cutoff = 0.3)
 plot(fit)
 fa.diagram(fit)
 
@@ -178,8 +272,20 @@ unique(dv.shor$authorize[which(dv.shor$year>2010)])
 iv=read.csv("data/ACAIVData.csv")
 head(iv)
 iv=iv%>%
-  select(state.year,capita.income,fpl,no.insurance,operations.capita,health.donor.capita)
+  dplyr::select(state.year,capita.income,fpl,no.insurance,operations.capita,health.donor.capita)
 dv.shor.iv=full_join(dv.shor,iv)
 head(dv.shor.iv)
 
 #########Attaching competition scores##########
+competition=read.csv("Data/competitionvariables.csv")
+head(competition)
+competition=competition[,-1]
+working.data=full_join(dv.shor.iv,competition)
+summary(working.data)
+write.csv(working.data,"Data/workingdata.csv")
+
+
+
+#############################################################################
+##############This is the space for actual modeling##########################
+#############################################################################

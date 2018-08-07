@@ -1,6 +1,7 @@
 library(tidyverse)
 competition.raw=read.csv("Data/SideData/competitionrawdata.csv")
 head(competition.raw)
+summary(competition.raw)
 competition.formatted=competition.raw%>%
   mutate(pres.margin=abs(pres.rep.perc-pres.dem.perc))%>%
   mutate(hs_dem_perc=100*(hs_dem_in_sess/hs_tot_in_sess))%>%
@@ -34,7 +35,7 @@ competition.formatted=competition.raw%>%
            lag(sen_switch,9))%>%
   mutate(chamber.changes=hs_changes+sen_changes)%>%
   filter(year>2010)%>%
-  dplyr::select(state.year,chamber.changes,effective.party,pres.margin,competition.lee)
+  dplyr::select(state.year,gov_control,chamber.changes,effective.party,pres.margin,competition.lee)
 
 competition.formatted[c(1:20),]
 write.csv(competition.formatted,"Data/competitionvariables.csv")
