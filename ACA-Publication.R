@@ -34,8 +34,113 @@ plot(fit)
 fa.diagram(fit)
 ##################The results show that the components load on two factors relatively clearly with positive action loading on factor 2 and expansion and negative action on factyor 1
 
-#########################Running some models##################################
+
+#########################majority average model##################################
 head(df)
+df=df%>%
+  mutate(chamber.majorities=(hou_majority+sen_majority)/2)
+
+####################Examining key variables#################
+hist(df$capita.income)#this should be logged
+hist(df$operations.capita)
+hist(df$health.donor.capita)
+df[which(df$operations.capita>8000),]#Just alaska
+
+hist(df$chamber.majorities)
+hist(df$chamber.changes)
+hist(df$effective.party)
+df[which(df$effective.party>2),]#Just alaska
+hist(df$competition.lee)
+hist(df$competition.lee.up)
+
+hist(df$response.weighted)
+df=df%>%
+  mutate(capita.log=log(capita.income))%>%
+  mutate(chamber.majorities=-1*chamber.majorities)%>%
+  mutate(competition.lee.up=50-competition.lee)
+           
+
+maj.chamber.shifts=lm(response.weighted~chamber.changes+chamber.majorities+chamber.majorities*chamber.changes+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.chamber.shifts)
+maj.chamber.shifts.robust =coeftest(maj.chamber.shifts, vcov = NeweyWest(maj.chamber.shifts,lag=1))
+print(maj.chamber.shifts.robust)
+length(maj.chamber.shifts$residuals)
+
+maj.effective=lm(response.weighted~effective.party+chamber.majorities+chamber.majorities*effective.party+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.effective)
+
+maj.competitionlee=lm(response.weighted~competition.lee.up+chamber.majorities+chamber.majorities*competition.lee.up+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.competitionlee)
+
+###########################Lets make some plots###############################
+####This is a final plot I will be using
+panel.data=working ###This section adds a line to the dataset to better sort the data
+panel.data$final.index=array(NA,200)
+for (i in c(1:length(panel.data$state))){
+  panel.data$final.index[i]=panel.data$index.unified[which(panel.data$state==panel.data$state[i] & panel.data$year==2014)]
+}
+panel.data=panel.data%>%
+  mutate(coop.bin=ifelse(year==2014,20,20))%>%
+  mutate(resist.bin=ifelse(year==2014,0,0))
+
+annualindex11=dotplot(reorder(state[which(year==2011)],index[which(year==2014)])~index[which(year==2011)],data=working,col="black",xlab="Implementation Index\n2011",scales=list(y=list(alternating=1),x=list(limits=c(-20,30))),panel =function(x,y,...){panel.dotplot(x,y,...);
+  panel.abline(v=10, col="black",lty="dotted");
+  panel.abline(v=0, col="black",lty="dotted")})
+
+head(panel.data)
+summary(as.factor(panel.data$index.binary))
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+dev.new()
+ggplot(panel.data,aes(x= reorder(state,final.index),y=index.unified,color=as.factor(index.binary.unified))) +
+  scale_color_manual(labels = c("Resist", "Negotiate","Cooperate"),values=c("#D55E00", "#0072B2", "#009E73")) +
+  geom_point() +
+  facet_wrap( ~ year, ncol=4, scales="free") +
+  #geom_hline(aes(yintercept=coop.bin),color="Blue")+
+  #geom_hline(aes(yintercept=resist.bin),color="Red")+
+  coord_flip() +
+  ggtitle(expression("Annual Medicaid Implementation Index")) +
+  labs(y="Medicaid Implementation Index",x="State",color="Implementation Rank:")+
+  theme(
+    plot.title = element_text(hjust = 0.5,size = 11),
+    axis.text.x=element_text(size=8),
+    plot.caption=element_text(hjust = 0,size=10,face="italic",lineheight=1),
+    axis.text.y=element_text(size=6),
+    panel.spacing.x=unit(0.1, "lines"),
+    legend.position="bottom",
+    legend.direction="horizontal")+
+  ggsave(filename="MedicaidIndex.png",device="png",width = 9, height = 6, units = "in", path="/Users/eringutbrod/Research/1 Dissertation Active/JobTalk/Images/Figure PNGS",dpi=300)
+
+
+
+
+
+##############Analysis for the appendix################
+maj.chamber.shifts.unweighted=lm(response.unweighted~chamber.changes+chamber.majorities+chamber.majorities*chamber.changes+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.chamber.shifts.unweighted)
+
+maj.effective.unweighted=lm(response.unweighted~effective.party+chamber.majorities+chamber.majorities*effective.party+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.effective.unweighted)
+
+
+maj.competitionlee.unweighted=lm(response.unweighted~competition.lee+chamber.majorities+chamber.majorities*competition.lee+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.competitionlee.unweighted)
+
+
+
+####Droppped because presidential margin is not weighted effectively from one year
+maj.pres.margin=lm(response.weighted~pres.margin+chamber.majorities+chamber.majorities*pres.margin+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(maj.pres.margin)
+
+
+
+
+
+
+
+
+#############################################################################
+##############This spac examines different models for the main model##########################
+#############################################################################
 ###########################Split Chamber Models######################
 chamber.shifts=lm(response.weighted~chamber.changes+hou_majority+hou_majority*chamber.changes+sen_majority+sen_majority*chamber.changes+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
 analytics(chamber.shifts)###Clears NCV but only barely, high VIF but it still works
@@ -95,6 +200,21 @@ analytics(maj.competitionlee)
 maj.competitionlee.unweighted=lm(response.unweighted~competition.lee+chamber.majorities+chamber.majorities*competition.lee+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
 analytics(maj.competitionlee.unweighted)
 
+
+
+###########################chamber Average Models######################
+df=df%>%
+  mutate(chamber.ideals=(hou_chamber+sen_chamber)/2)
+
+ideals.chamber.shifts=lm(response.weighted~chamber.changes+chamber.ideals+chamber.ideals*chamber.changes+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(ideals.chamber.shifts)
+
+ideals.effective=lm(response.weighted~effective.party+chamber.ideals+chamber.ideals*effective.party+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(ideals.effective)
+
+ideals.competitionlee=lm(response.weighted~competition.lee+chamber.ideals+chamber.ideals*competition.lee+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
+analytics(ideals.competitionlee)
+
 #############################################################################
 ##############This space reads in the data and puts it into one file##########################
 #############################################################################
@@ -143,7 +263,6 @@ response.dvs=response.working%>%
            (nfib.challenge*-5)+
            (king.challenge*-5)+
            (grant.returns)+
-           (expansion.delay)+
            (funding.cuts*-2)+
            (leg.challenge*-2)+
            (compact*-2)+
@@ -159,7 +278,6 @@ response.dvs=response.working%>%
            (nfib.challenge*-5)+
            (king.challenge*-5)+
            (grant.returns)+
-           (expansion.delay)+
            (funding.cuts*-2)+
            (leg.challenge*-2)+
            (compact*-2)+
@@ -176,7 +294,6 @@ response.dvs=response.working%>%
            (nfib.challenge*-1)+
            (king.challenge*-1)+
            (if_else(grant.returns<0,-1,0))+
-           (if_else(expansion.delay<0,-1,0))+
            (funding.cuts*-1)+
            (leg.challenge*-1)+
            (compact*-1)+
@@ -192,7 +309,6 @@ response.dvs=response.working%>%
            (nfib.challenge*-5)+
            (king.challenge*-5)+
            (grant.returns)+
-           (expansion.delay)+
            (funding.cuts*-2)+
            (leg.challenge*-2)+
            (compact*-2)+
@@ -204,7 +320,7 @@ response.dvs=response.working%>%
            (expansion*5))
 summary(response.dvs$nonexpanse.unweighted[which(response.dvs$expansion==1)])
 response.dvs[which(response.dvs$expansion==1 & response.dvs$nonexpanse.unweighted < -1),]
-response.dvs[which(response.dvs$expansion==1 & response.dvs$nonexpanse.weighted < -15),]
+response.dvs[which(response.dvs$expansion==1 & response.dvs$nonexpanse.weighted < -14),]
 
 ##############Plotting my DV's
 cor.test(response.dvs$response.unweighted,response.dvs$response.weighted)
