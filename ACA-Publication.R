@@ -8,10 +8,10 @@ library(GPArotation)
 #############################################################################
 ##############This is the space for actual modeling##########################
 #############################################################################
-df=read.csv("Data/workingdata.csv")
+df=read.csv("Data/workingdata-alternate.csv")
 head(df)
 df=df[,-1]
-
+summary(df)
 ####################Comparing DV's##########################
 ##############Plotting my DV's
 cor.test(df$response.unweighted,df$response.weighted)
@@ -19,26 +19,26 @@ cor.test(df$nonexpanse.weighted,df$nonexpanse.unweighted)
 plot(df$response.unweighted,df$response.weighted)
 #The results show that the unweighted and weighted scores are pretty comparable
 
-##############PCA analysis
-df.pca=read.csv("Data/workingdataFULL.csv")
-pca.data=df.pca%>%
-  dplyr::select(state.year,grant.weighted,expansion,expansion.delay,nfib.support,king.support,authorize,waiver.expansion,nfib.challenge,king.challenge,grant.returns,mandate.challenge,leg.challenge,compact,leg.lit,fund.return,repeal,funding.cuts,grant.total)%>%
+##############PCA analysis with unweighted groups
+#df.pca=read.csv("Data/workingdata-.csv")
+pca.data=df%>%
+  dplyr::select(state.year,grant.weighted.alt,expansion,nfib.support,king.support,authorize,nfib.challenge,king.challenge,grant.returns,anti.legislation,grant.total)%>%
   mutate(litigation=nfib.support-nfib.challenge+king.support-king.challenge)%>%
-  mutate(anti.legislation=-1*(funding.cuts+leg.challenge+compact+fund.return+mandate.challenge+leg.lit+repeal))%>%
-  dplyr::select(expansion,authorize,litigation,anti.legislation,grant.weighted,grant.returns)
+  mutate(anti.legislation=-1*anti.legislation)%>%
+  mutate(grant.returns=-1*grant.returns)%>%
+  dplyr::select(expansion,authorize,litigation,anti.legislation,grant.total,grant.returns)
 
 fit <- principal(pca.data, nfactors=2, rotate="oblimin")
 fit # print results
 print(fit$loadings,cutoff = 0.3)
 plot(fit)
 fa.diagram(fit)
-##################The results show that the components load on two factors relatively clearly with positive action loading on factor 2 and expansion and negative action on factyor 1
-
 
 #########################majority average model##################################
 head(df)
 df=df%>%
-  mutate(chamber.majorities=(hou_majority+sen_majority)/2)
+  mutate(chamber.majorities=(hou_majority+sen_majority)/2)%>%
+  mutate(response.index=if_else(response.weighted<0,-1,if_else(response.weighted>9,1,0)))
 
 ####################Examining key variables#################
 hist(df$capita.income)#this should be logged
@@ -54,52 +54,73 @@ hist(df$competition.lee)
 hist(df$competition.lee.up)
 
 hist(df$response.weighted)
-df=df%>%
+
+########You need to center your competition variables to interpret chamber majorities
+describe(df$chamber.changes)
+describe(df$effective.party)
+describe(df$competition.lee.up)
+
+df.working=df%>%
   mutate(capita.log=log(capita.income))%>%
   mutate(chamber.majorities=-1*chamber.majorities)%>%
-  mutate(competition.lee.up=50-competition.lee)
-           
+  mutate(competition.lee.up=50-competition.lee)%>%
+  mutate(competition.chambers.up=50-competition.lee.chambers)
 
-maj.chamber.shifts=lm(response.weighted~chamber.changes+chamber.majorities+chamber.majorities*chamber.changes+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df)
+df.working$chamber.changes.cent=scale(df.working$chamber.changes, scale = FALSE)[,1]
+df.working$effective.party.cent=scale(df.working$effective.party, scale=FALSE)[,1]
+df.working$competition.lee.cent=scale(df.working$competition.lee.up, scale=FALSE)[,1]
+df.working$competition.chambers.cent=scale(df.working$competition.chambers.up, scale=FALSE)[,1]
+
+summary(df.working)
+summary(df.working$chamber.changes.cent)
+###################Running basic models for weighted scores
+maj.chamber.shifts=lm(response.weighted~chamber.changes.cent+chamber.majorities+chamber.majorities*chamber.changes.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
 analytics(maj.chamber.shifts)
-maj.chamber.shifts.robust =coeftest(maj.chamber.shifts, vcov = NeweyWest(maj.chamber.shifts,lag=1))
-print(maj.chamber.shifts.robust)
-length(maj.chamber.shifts$residuals)
+coeftest(maj.chamber.shifts, vcov = vcovHC(maj.chamber.shifts,type="HC1"))
+coeftest(maj.chamber.shifts, vcov = vcovHAC(maj.chamber.shifts))
 
-maj.effective=lm(response.weighted~effective.party+chamber.majorities+chamber.majorities*effective.party+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df)
+maj.effective=lm(response.weighted~effective.party.cent+chamber.majorities+chamber.majorities*effective.party.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
 analytics(maj.effective)
+coeftest(maj.effective, vcov = vcovHC(maj.effective,type="HC1"))
+coeftest(maj.effective, vcov = vcovHAC(maj.effective))
 
-maj.competitionlee=lm(response.weighted~competition.lee.up+chamber.majorities+chamber.majorities*competition.lee.up+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df)
+maj.competitionlee=lm(response.weighted~competition.lee.cent+chamber.majorities+chamber.majorities*competition.lee.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
 analytics(maj.competitionlee)
+coeftest(maj.competitionlee, vcov = vcovHC(maj.competitionlee,type="HC1"))
+coeftest(maj.competitionlee, vcov = vcovHAC(maj.competitionlee))
 
+maj.competitionchambers=lm(response.weighted~competition.chambers.cent+chamber.majorities+chamber.majorities*competition.chambers.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+analytics(maj.competitionchambers)
+coeftest(maj.competitionchambers, vcov = vcovHC(maj.competitionchambers,type="HC1"))
+coeftest(maj.competitionchambers, vcov = vcovHAC(maj.competitionchambers))
 ###########################Lets make some plots###############################
-####This is a final plot I will be using
-panel.data=working ###This section adds a line to the dataset to better sort the data
-panel.data$final.index=array(NA,200)
-for (i in c(1:length(panel.data$state))){
-  panel.data$final.index[i]=panel.data$index.unified[which(panel.data$state==panel.data$state[i] & panel.data$year==2014)]
+####Implementation Index Plot########
+panel.data=df ###This section adds a line to the dataset to better sort the data
+summary(panel.data)
+dim(panel.data)
+panel.data$final.index=array(NA,300)
+for (i in c(1:length(panel.data$state.postal))){
+  panel.data$final.index[i]=panel.data$response.index[which(panel.data$state.postal==panel.data$state.postal[i] & panel.data$year==2016)]
 }
+
 panel.data=panel.data%>%
   mutate(coop.bin=ifelse(year==2014,20,20))%>%
   mutate(resist.bin=ifelse(year==2014,0,0))
 
-annualindex11=dotplot(reorder(state[which(year==2011)],index[which(year==2014)])~index[which(year==2011)],data=working,col="black",xlab="Implementation Index\n2011",scales=list(y=list(alternating=1),x=list(limits=c(-20,30))),panel =function(x,y,...){panel.dotplot(x,y,...);
-  panel.abline(v=10, col="black",lty="dotted");
-  panel.abline(v=0, col="black",lty="dotted")})
-
-head(panel.data)
-summary(as.factor(panel.data$index.binary))
+summary(as.factor(panel.data$response.index))
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 dev.new()
-ggplot(panel.data,aes(x= reorder(state,final.index),y=index.unified,color=as.factor(index.binary.unified))) +
-  scale_color_manual(labels = c("Resist", "Negotiate","Cooperate"),values=c("#D55E00", "#0072B2", "#009E73")) +
-  geom_point() +
-  facet_wrap( ~ year, ncol=4, scales="free") +
+#color plot
+ggplot(panel.data,aes(x= reorder(state.postal,final.index),y=response.weighted,group=as.factor(response.index))) +
+  geom_point(aes(shape=as.factor(response.index), color=as.factor(response.index))) +
+  scale_shape_manual(name="Response Type",values=c(3, 16, 17),labels = c("Resist", "Negotiate","Cooperate"))+
+  scale_color_manual(name="Response Type",values=c("#D55E00", "#0072B2", "#009E73"),labels = c("Resist", "Negotiate","Cooperate")) +
+  facet_wrap( ~ year, ncol=6, scales="free") +
   #geom_hline(aes(yintercept=coop.bin),color="Blue")+
   #geom_hline(aes(yintercept=resist.bin),color="Red")+
   coord_flip() +
-  ggtitle(expression("Annual Medicaid Implementation Index")) +
-  labs(y="Medicaid Implementation Index",x="State",color="Implementation Rank:")+
+  ggtitle(expression("Figure 1: Annual Medicaid Implementation Index")) +
+  labs(y="Medicaid Implementation Index",x="State")+
   theme(
     plot.title = element_text(hjust = 0.5,size = 11),
     axis.text.x=element_text(size=8),
@@ -108,35 +129,91 @@ ggplot(panel.data,aes(x= reorder(state,final.index),y=index.unified,color=as.fac
     panel.spacing.x=unit(0.1, "lines"),
     legend.position="bottom",
     legend.direction="horizontal")+
-  ggsave(filename="MedicaidIndex.png",device="png",width = 9, height = 6, units = "in", path="/Users/eringutbrod/Research/1 Dissertation Active/JobTalk/Images/Figure PNGS",dpi=300)
+  ggsave(filename="MedicaidIndex.png",device="png",width = 11, height = 8, units = "in", path="Figure PNGs",dpi=300)
+
+####Predicted Chamber Shift Plot########
+###Generating a Risk * Ideal figure across various risk assessments for House
+summary(df.working)
+plottable.data = df.working %>%####Generate a mean variable list of the data table
+  dplyr::select(response.weighted,chamber.changes.cent,effective.party.cent,competition.lee.cent,competition.chambers.cent,chamber.majorities,gov_control,capita.log,operations.capita,health.donor.capita,year,chamber.changes,effective.party,competition.lee.up,competition.chambers.up)%>%
+  mutate(capita.log=mean(capita.log,na.rm=TRUE))%>%
+  mutate(operations.capita=mean(operations.capita,na.rm=TRUE))%>%
+  mutate(health.donor.capita=mean(health.donor.capita,na.rm=TRUE))%>%
+  mutate(gov_control=0)%>%
+  mutate(year=2014)
+
+summary(df.working$chamber.changes)#min 0,mean=1.578,max=7
+summary(df.working$chamber.changes.cent)#min -1.578 mean=0,max=5.42
+dim(plottable.data)
+
+chamberplot.min=plottable.data%>%
+  mutate(chamber.changes.cent=-1.5782)
+chamberpredict.min=predict.lm(maj.chamber.shifts,newdata= chamberplot.min,interval='predict')
+chamberplot.min=cbind(chamberplot.min,chamberpredict.min)
+chamberplot.min$class=array("0 Shifts",300)
+head(chamberplot.min)
+
+chamberplot.two=plottable.data%>%
+  mutate(chamber.changes.cent=0.4218)
+chamberpredict.two=predict.lm(maj.chamber.shifts,newdata= chamberplot.two,interval='predict')
+chamberplot.two=cbind(chamberplot.two,chamberpredict.two)
+chamberplot.two$class=array("2 Shifts",300)
+head(chamberplot.two)
+
+chamberplot.four=plottable.data%>%
+  mutate(chamber.changes.cent=2.4218)
+chamberpredict.four=predict.lm(maj.chamber.shifts,newdata= chamberplot.four,interval='predict')
+chamberplot.four=cbind(chamberplot.four,chamberpredict.four)
+chamberplot.four$class=array("4 Shifts",300)
+head(chamberplot.four)
+
+chamberplot.six=plottable.data%>%
+  mutate(chamber.changes.cent=4.4218)
+chamberpredict.six=predict.lm(maj.chamber.shifts,newdata= chamberplot.six,interval='predict')
+chamberplot.six=cbind(chamberplot.six,chamberpredict.six)
+chamberplot.six$class=array("6 Shifts",300)
+head(chamberplot.six)
 
 
+chamberplot.data=rbind(chamberplot.min, chamberplot.two, chamberplot.four, chamberplot.six)
+dim(chamberplot.data)
+head(chamberplot.data)
+
+dev.new()
+ggplot(chamberplot.data,aes(x= chamber.majorities, y=fit,group=class,color=class)) +
+  geom_smooth() +
+  scale_color_brewer(palette="GnBu") +
+  ggtitle("Figure 2: Predicted Implementation Index vs. Mean Chamber Majority Ideal Point\nUnder Different Levels of Chamber Turnover") +
+  labs(x="Lower Chamber Majority Ideal Point",y="Predicted Implementation Index\n(Other variables held at mean)",color="# of Chamber Changes\nin the Past 10 Years") +
+  scale_y_continuous(breaks=seq(-4,14,2),labels=seq(-4,14,2))+
+  theme(
+    plot.title = element_text(hjust = 0.5,size = 11),
+    axis.text.x=element_text(size=8),
+    plot.caption=element_text(hjust = 0,size=10,face="italic",lineheight=1),
+    axis.text.y=element_text(size=8),
+    panel.background = element_rect(fill = "white",
+                                    colour = "black",
+                                    size = 0.5, linetype = "solid"),
+    panel.grid.major = element_line(size = 0.5, linetype = 'dashed',
+                                    colour = "black"), 
+    panel.grid.minor = element_blank()
+  )+
+ggsave(filename="ChamberChangesPredicted.png",device="png", width = 8, height = 5, units = "in", path="Figure PNGs",dpi=300)
 
 
 
 ##############Analysis for the appendix################
-maj.chamber.shifts.unweighted=lm(response.unweighted~chamber.changes+chamber.majorities+chamber.majorities*chamber.changes+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
-analytics(maj.chamber.shifts.unweighted)
+maj.chamber.shifts.un=lm(response.unweighted~chamber.changes.cent+chamber.majorities+chamber.majorities*chamber.changes.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+analytics(maj.chamber.shifts.un)
+  
+maj.effective.un=lm(response.unweighted~effective.party.cent+chamber.majorities+chamber.majorities*effective.party.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+analytics(maj.effective.un)
+  
+maj.competitionlee.un=lm(response.unweighted~competition.lee.cent+chamber.majorities+chamber.majorities*competition.lee.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+analytics(maj.competitionlee.un)
 
-maj.effective.unweighted=lm(response.unweighted~effective.party+chamber.majorities+chamber.majorities*effective.party+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
-analytics(maj.effective.unweighted)
-
-
-maj.competitionlee.unweighted=lm(response.unweighted~competition.lee+chamber.majorities+chamber.majorities*competition.lee+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
-analytics(maj.competitionlee.unweighted)
-
-
-
-####Droppped because presidential margin is not weighted effectively from one year
-maj.pres.margin=lm(response.weighted~pres.margin+chamber.majorities+chamber.majorities*pres.margin+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df)
-analytics(maj.pres.margin)
-
-
-
-
-
-
-
+maj.competitionchambers.un=lm(response.unweighted~competition.chambers.cent+chamber.majorities+chamber.majorities*competition.chambers.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+analytics(maj.competitionchambers.un)
 
 #############################################################################
 ##############This spac examines different models for the main model##########################
@@ -215,190 +292,6 @@ analytics(ideals.effective)
 ideals.competitionlee=lm(response.weighted~competition.lee+chamber.ideals+chamber.ideals*competition.lee+gov_control+capita.income+operations.capita+health.donor.capita+as.factor(year),data=df)
 analytics(ideals.competitionlee)
 
-#############################################################################
-##############This space reads in the data and puts it into one file##########################
-#############################################################################
-####################Reading in data##########################################
-############Reading in State Response Data
-response=read.csv(file="Data/MedicaidResponseData.csv")
-summary(response)
-
-response.clean=response%>%
-  mutate(expansion=if_else(is.na(as.numeric(expansion)),0,as.numeric(expansion)))%>%
-  dplyr::select(state.postal,state.fips,year,state.year,expansion,expansion.delay,expansion.early,research.funds,nfib.support,king.support,authorize,waiver.expansion,nfib.challenge,king.challenge,grant.returns,Active.Waiver,mandate.challenge,leg.challenge,compact,leg.lit,fund.return,repeal,funding.cuts)
-
-########adding in grants
-grants=read.csv("data/grantdata.csv")
-head(grants)
-grants=grants%>%
-  dplyr::filter(date>2010)%>%
-  dplyr::select(state.year,planning,level.1,level.2,innovator,grant.total,grant.weighted)
-
-response.working=full_join(response.clean,grants)
-response.working=response.working%>%  
-  mutate(planning=if_else(is.na(as.numeric(planning)),0,as.numeric(planning)))%>%
-  mutate(level.1=if_else(is.na(as.numeric(level.1)),0,as.numeric(level.1)))%>%
-  mutate(level.2=if_else(is.na(as.numeric(level.2)),0,as.numeric(level.2)))%>%
-  mutate(innovator=if_else(is.na(as.numeric(innovator)),0,as.numeric(innovator)))%>%
-  mutate(grant.total=if_else(is.na(as.numeric(grant.total)),0,as.numeric(grant.total)))%>%
-  mutate(grant.weighted=if_else(is.na(as.numeric(grant.weighted)),0,as.numeric(grant.weighted)))
-head(response.working)
-
-
-######################################Producing our DV's#########################
-#########Positive##########
-#Expansion - 1 = 20, 0 = 0 #grant.weighted - stays same, #nfib.support - +5 #king.support - +5, #+1 per authorize, stays same
-####Negative#######
-#nfib.challenge, #king.challenge - -5, #grant.returns, -grant totals*2
-#delay, -3 per year
-#-2 for delay legislation (funding.cuts, leg.challenge, compacts, fund.return)
-#-5 for rejection legislation (mandate.challenge, leg.lit, repeal)
-#waiver.expansion, -10
-summary(response.working)
-response.dvs=response.working%>%
-  mutate(nonexpanse.weighted=grant.weighted+
-           (nfib.support*5)+
-           (king.support*5)+
-           (authorize)+
-           (nfib.challenge*-5)+
-           (king.challenge*-5)+
-           (grant.returns)+
-           (funding.cuts*-2)+
-           (leg.challenge*-2)+
-           (compact*-2)+
-           (fund.return*-2)+
-           (mandate.challenge*-5)+
-           (leg.lit*-5)+
-           (repeal*-5)+
-           (waiver.expansion*-10))%>%
-  mutate(response.weighted=grant.weighted+
-           (nfib.support*5)+
-           (king.support*5)+
-           (authorize)+
-           (nfib.challenge*-5)+
-           (king.challenge*-5)+
-           (grant.returns)+
-           (funding.cuts*-2)+
-           (leg.challenge*-2)+
-           (compact*-2)+
-           (fund.return*-2)+
-           (mandate.challenge*-5)+
-           (leg.lit*-5)+
-           (repeal*-5)+
-           (waiver.expansion*-10)+
-           (expansion*20))%>%
-  mutate(nonexpanse.unweighted=grant.total+
-           (nfib.support)+
-           (king.support)+
-           (authorize)+
-           (nfib.challenge*-1)+
-           (king.challenge*-1)+
-           (if_else(grant.returns<0,-1,0))+
-           (funding.cuts*-1)+
-           (leg.challenge*-1)+
-           (compact*-1)+
-           (fund.return*-1)+
-           (mandate.challenge*-1)+
-           (leg.lit*-1)+
-           (repeal*-1)+
-           (waiver.expansion*-1))%>%
-  mutate(response.unweighted=grant.weighted+
-           (nfib.support*5)+
-           (king.support*5)+
-           (authorize)+
-           (nfib.challenge*-5)+
-           (king.challenge*-5)+
-           (grant.returns)+
-           (funding.cuts*-2)+
-           (leg.challenge*-2)+
-           (compact*-2)+
-           (fund.return*-2)+
-           (mandate.challenge*-5)+
-           (leg.lit*-5)+
-           (repeal*-5)+
-           (waiver.expansion*-10)+
-           (expansion*5))
-summary(response.dvs$nonexpanse.unweighted[which(response.dvs$expansion==1)])
-response.dvs[which(response.dvs$expansion==1 & response.dvs$nonexpanse.unweighted < -1),]
-response.dvs[which(response.dvs$expansion==1 & response.dvs$nonexpanse.weighted < -14),]
-
-##############Plotting my DV's
-cor.test(response.dvs$response.unweighted,response.dvs$response.weighted)
-cor.test(response.dvs$nonexpanse.weighted,response.dvs$nonexpanse.unweighted)
-plot(response.dvs$response.unweighted,response.dvs$response.weighted)
-
-####other DV's
-dvs=response.dvs%>%
-  mutate(litigation=nfib.support-nfib.challenge+king.support-king.challenge)%>%
-  mutate(anti.legislation=funding.cuts+leg.challenge+compact+fund.return+mandate.challenge+leg.lit+repeal)%>%
-  dplyr::select(state.postal,state.fips,year,state.year,response.unweighted,response.weighted,nonexpanse.unweighted,nonexpanse.weighted,expansion,litigation,anti.legislation,authorize,grant.weighted)
-
-head(dvs)
-
-####################Attempting a PCA
-head(response.working)
-pca.data=response.working%>%
-  dplyr::select(state.year,grant.weighted,expansion,expansion.delay,nfib.support,king.support,authorize,waiver.expansion,nfib.challenge,king.challenge,grant.returns,mandate.challenge,leg.challenge,compact,leg.lit,fund.return,repeal,funding.cuts,grant.total)%>%
-  mutate(litigation=nfib.support-nfib.challenge+king.support-king.challenge)%>%
-  mutate(anti.legislation=-1*(funding.cuts+leg.challenge+compact+fund.return+mandate.challenge+leg.lit+repeal))%>%
-  dplyr::select(expansion,authorize,litigation,anti.legislation,grant.weighted,grant.returns)
-summary(pca.data)
-fit <- princomp(expansion+authorize+litigation+anti.legislation+grant.total+grant.returns, data=pca.data, cor=TRUE)
-summary(fit) # print variance accounted for 
-loadings(fit) # pc loadings 
-plot(fit,type="lines") # scree plot 
-length(fit$scores) # the principal components
-dev.new()
-biplot(fit)
-  
-####################Attempting a PCA - 2-Use This One!
-parallel <- fa.parallel(pca.data, fm = 'wls', fa = 'fa')
-threefactor <- fa(pca.data,nfactors = 3,rotate = "oblimin",fm="wls")
-print(threefactor)
-print(threefactor$loadings,cutoff = 0.3)
-plot(threefactor)
-fa.diagram(threefactor)
-
-fit <- principal(pca.data, nfactors=3, rotate="oblimin")
-fit # print results
-print(fit$loadings,cutoff = 0.3)
-plot(fit)
-fa.diagram(fit)
-
-
-################Attaching Shor Data
-head(dvs)
-unique(dvs$year)
-shor.data=read.dta13("/Users/eringutbrod/Projects/Resources/Datahub/Shor_data/2018 Update/shor mccarty 1993-2016 state aggregate data May 2018 release (Updated July 2018).dta")
-head(shor.data)
-shor.useful=shor.data%>%
-  filter(year>2010)%>%
-  mutate(state.year=paste(st,year,sep=""))%>%
-  dplyr::select(state.year,hou_chamber,hou_dem,hou_rep,hou_majority,sen_chamber,sen_dem,sen_rep,sen_majority)
-head(shor.useful)
-summary(shor.useful)
-shor.useful[which(is.na(shor.useful$hou_rep)),]
-shor.useful[which(is.na(shor.useful$sen_rep)),]
-dim(dvs)
-dim(shor.useful)
-dv.shor=full_join(dvs,shor.useful)
-head(dv.shor)
-unique(dv.shor$authorize[which(dv.shor$year>2010)])
-#########Attaching other IV's##############
-iv=read.csv("data/ACAIVData.csv")
-head(iv)
-iv=iv%>%
-  dplyr::select(state.year,capita.income,fpl,no.insurance,operations.capita,health.donor.capita)
-dv.shor.iv=full_join(dv.shor,iv)
-head(dv.shor.iv)
-
-#########Attaching competition scores##########
-competition=read.csv("Data/competitionvariables.csv")
-head(competition)
-competition=competition[,-1]
-working.data=full_join(dv.shor.iv,competition)
-summary(working.data)
-write.csv(working.data,"Data/workingdata.csv")
 
 
 
