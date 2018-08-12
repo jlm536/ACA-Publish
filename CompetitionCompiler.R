@@ -7,6 +7,7 @@ competition.formatted=competition.raw%>%
   mutate(hs_dem_perc=100*(hs_dem_in_sess/hs_tot_in_sess))%>%
   mutate(sen_dem_perc=100*(sen_dem_in_sess/sen_tot_in_sess))%>%
   mutate(competition.lee=abs(((sen_dem_perc+hs_dem_perc+gov.dem.percent)/3)-50))%>%
+  mutate(competition.lee.chambers=abs(((sen_dem_perc+hs_dem_perc)/2)-50))%>%
   mutate(dem.seats=(sen_dem_in_sess+hs_dem_in_sess)/(sen_tot_in_sess+hs_tot_in_sess))%>%
   mutate(rep.seats=(sen_rep_in_sess+hs_rep_in_sess)/(sen_tot_in_sess+hs_tot_in_sess))%>%
   mutate(effective.party=1/((dem.seats)^2+(rep.seats)^2))%>%
@@ -35,7 +36,7 @@ competition.formatted=competition.raw%>%
            lag(sen_switch,9))%>%
   mutate(chamber.changes=hs_changes+sen_changes)%>%
   filter(year>2010)%>%
-  dplyr::select(state.year,gov_control,chamber.changes,effective.party,pres.margin,competition.lee)
+  dplyr::select(state.year,gov_control,chamber.changes,effective.party,pres.margin,competition.lee,competition.lee.chambers)
 
 competition.formatted[c(1:20),]
 write.csv(competition.formatted,"Data/competitionvariables.csv")

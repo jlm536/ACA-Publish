@@ -132,7 +132,7 @@ ggplot(panel.data,aes(x= reorder(state.postal,final.index),y=response.weighted,g
   ggsave(filename="MedicaidIndex.png",device="png",width = 11, height = 8, units = "in", path="Figure PNGs",dpi=300)
 
 ####Predicted Chamber Shift Plot########
-###Generating a Risk * Ideal figure across various risk assessments for House
+###Chamber Changes Plot
 summary(df.working)
 plottable.data = df.working %>%####Generate a mean variable list of the data table
   dplyr::select(response.weighted,chamber.changes.cent,effective.party.cent,competition.lee.cent,competition.chambers.cent,chamber.majorities,gov_control,capita.log,operations.capita,health.donor.capita,year,chamber.changes,effective.party,competition.lee.up,competition.chambers.up)%>%
@@ -200,6 +200,132 @@ ggplot(chamberplot.data,aes(x= chamber.majorities, y=fit,group=class,color=class
   )+
 ggsave(filename="ChamberChangesPredicted.png",device="png", width = 8, height = 5, units = "in", path="Figure PNGs",dpi=300)
 
+
+##########Effective Parties Plot data
+summary(df.working$effective.party)#min 1.23, 1st=1.733, mean=1.82, third=1.972,max=2.15
+summary(df.working$effective.party.cent)#min -0.58, 1st=-0.088 mean=0,3rd= 0.15140, max=0.32778
+dim(plottable.data)
+hist(df.working$effective.party)
+
+effectiveplot.min=plottable.data%>%
+  mutate(effective.party.cent=-0.697)
+effectivepredict.min=predict.lm(maj.effective,newdata= effectiveplot.min,interval='predict')
+effectiveplot.min=cbind(effectiveplot.min,effectivepredict.min)
+effectiveplot.min$class=array("1.2",300)
+head(effectiveplot.min)
+
+effectiveplot.first=plottable.data%>%
+  mutate(effective.party.cent=-0.497)
+effectivepredict.first=predict.lm(maj.effective,newdata= effectiveplot.first,interval='predict')
+effectiveplot.first=cbind(effectiveplot.first,effectivepredict.first)
+effectiveplot.first$class=array("1.4",300)
+head(effectiveplot.first)
+
+effectiveplot.mean=plottable.data%>%
+  mutate(effective.party.cent=-0.297)
+effectivepredict.mean=predict.lm(maj.effective,newdata= effectiveplot.mean,interval='predict')
+effectiveplot.mean=cbind(effectiveplot.mean,effectivepredict.mean)
+effectiveplot.mean$class=array("1.6",300)
+head(effectiveplot.mean)
+
+effectiveplot.third=plottable.data%>%
+  mutate(effective.party.cent=-0.097)
+effectivepredict.third=predict.lm(maj.effective,newdata= effectiveplot.third,interval='predict')
+effectiveplot.third=cbind(effectiveplot.third,effectivepredict.third)
+effectiveplot.third$class=array("1.8 (Mean)",300)
+head(effectiveplot.third)
+
+effectiveplot.max=plottable.data%>%
+  mutate(effective.party.cent=0.179)
+effectivepredict.max=predict.lm(maj.effective,newdata= effectiveplot.max,interval='predict')
+effectiveplot.max=cbind(effectiveplot.max,effectivepredict.max)
+effectiveplot.max$class=array("2",300)
+head(effectiveplot.max)
+
+effectiveplot.data=rbind(effectiveplot.first, effectiveplot.mean, effectiveplot.third, effectiveplot.max)
+dim(effectiveplot.data)
+head(effectiveplot.data)
+
+dev.new()
+ggplot(effectiveplot.data,aes(x= chamber.majorities, y=fit,group=class,color=class)) +
+  geom_smooth() +
+  scale_color_brewer(palette="GnBu") +
+  ggtitle("Figure 3: Predicted Implementation Index vs. Mean Chamber Majority Ideal Point\nUnder Different Effective Party Scores") +
+  labs(x="Lower Chamber Majority Ideal Point",y="Predicted Implementation Index\n(Other variables held at mean)",color="# of Effective Parties") +
+  scale_y_continuous(breaks=seq(-4,14,2),labels=seq(-4,14,2))+
+  theme(
+    plot.title = element_text(hjust = 0.5,size = 11),
+    axis.text.x=element_text(size=8),
+    plot.caption=element_text(hjust = 0,size=10,face="italic",lineheight=1),
+    axis.text.y=element_text(size=8),
+    panel.background = element_rect(fill = "white",
+                                    colour = "black",
+                                    size = 0.5, linetype = "solid"),
+    panel.grid.major = element_line(size = 0.5, linetype = 'dashed',
+                                    colour = "black"), 
+    panel.grid.minor = element_blank()
+  )+
+  ggsave(filename="EffectivePredicted.png",device="png", width = 8, height = 5, units = "in", path="Figure PNGs",dpi=300)
+
+
+##########Competition Chamber Plot Data
+summary(df.working$competition.chambers.up)#min 1.23, 1st=1.733, mean=1.82, third=1.972,max=2.15
+summary(df.working$competition.chambers.cent)#min -0.58, 1st=-0.088 mean=0,3rd= 0.15140, max=0.32778
+dim(plottable.data)
+hist(df.working$competition.chambers.up)
+
+competitionplot.min=plottable.data%>%
+  mutate(competition.chambers.cent=-14.739)
+competitionpredict.min=predict.lm(maj.competitionchambers,newdata= competitionplot.min,interval='predict')
+competitionplot.min=cbind(competitionplot.min,competitionpredict.min)
+competitionplot.min$class=array("20",300)
+head(competitionplot.min)
+
+competitionplot.first=plottable.data%>%
+  mutate(competition.chambers.cent=-4.739)
+competitionpredict.first=predict.lm(maj.competitionchambers,newdata= competitionplot.first,interval='predict')
+competitionplot.first=cbind(competitionplot.first,competitionpredict.first)
+competitionplot.first$class=array("30",300)
+head(competitionplot.first)
+
+competitionplot.second=plottable.data%>%
+  mutate(competition.chambers.cent=5.261)
+competitionpredict.second=predict.lm(maj.competitionchambers,newdata= competitionplot.second,interval='predict')
+competitionplot.second=cbind(competitionplot.second,competitionpredict.second)
+competitionplot.second$class=array("40",300)
+head(competitionplot.second)
+
+competitionplot.third=plottable.data%>%
+  mutate(competition.chambers.cent=15.261)
+competitionpredict.third=predict.lm(maj.competitionchambers,newdata= competitionplot.third,interval='predict')
+competitionplot.third=cbind(competitionplot.third,competitionpredict.third)
+competitionplot.third$class=array("50",300)
+head(competitionplot.third)
+
+chamberplot.data=rbind(competitionplot.min, competitionplot.first, competitionplot.second, competitionplot.third)
+dim(chamberplot.data)
+head(chamberplot.data)
+
+dev.new()
+ggplot(chamberplot.data,aes(x= chamber.majorities, y=fit,group=class,color=class)) +
+  geom_smooth() +
+  scale_color_brewer(palette="GnBu") +
+  ggtitle("Figure 4: Predicted Implementation Index vs. Mean Chamber Majority Ideal Point\nUnder Different Legislative Competition Scores") +
+  labs(x="Lower Chamber Majority Ideal Point",y="Predicted Implementation Index\n(Other variables held at mean)",color="Legislative Competition Score") +
+  scale_y_continuous(breaks=seq(-4,14,2),labels=seq(-4,14,2))+
+  theme(
+    plot.title = element_text(hjust = 0.5,size = 11),
+    axis.text.x=element_text(size=8),
+    plot.caption=element_text(hjust = 0,size=10,face="italic",lineheight=1),
+    axis.text.y=element_text(size=8),
+    panel.background = element_rect(fill = "white",
+                                    colour = "black",
+                                    size = 0.5, linetype = "solid"),
+    panel.grid.major = element_line(size = 0.5, linetype = 'dashed',
+                                    colour = "black"), 
+    panel.grid.minor = element_blank()
+  )+
+  ggsave(filename="ChamberPredicted.png",device="png", width = 8, height = 5, units = "in", path="Figure PNGs",dpi=300)
 
 
 ##############Analysis for the appendix################
