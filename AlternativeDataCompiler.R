@@ -127,7 +127,7 @@ head(shor.data)
 shor.useful=shor.data%>%
   filter(year>2010)%>%
   mutate(state.year=paste(st,year,sep=""))%>%
-  dplyr::select(state.year,hou_chamber,hou_dem,hou_rep,hou_majority,sen_chamber,sen_dem,sen_rep,sen_majority)
+  dplyr::select(state.year,hou_chamber,hou_dem,hou_rep,hou_majority,sen_chamber,sen_dem,sen_rep,sen_majority,h_diffs,s_diffs)
 head(shor.useful)
 summary(shor.useful)
 shor.useful[which(is.na(shor.useful$hou_rep)),]

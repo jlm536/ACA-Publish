@@ -38,6 +38,7 @@ fa.diagram(fit)
 head(df)
 df=df%>%
   mutate(chamber.majorities=(hou_majority+sen_majority)/2)%>%
+  mutate(polar=(h_diffs+s_diffs)/2)%>%
   mutate(response.index=if_else(response.weighted<0,-1,if_else(response.weighted>9,1,0)))
 
 ####################Examining key variables#################
@@ -45,6 +46,7 @@ hist(df$capita.income)#this should be logged
 hist(df$operations.capita)
 hist(df$health.donor.capita)
 df[which(df$operations.capita>8000),]#Just alaska
+hist(df$polar)
 
 hist(df$chamber.majorities)
 hist(df$chamber.changes)
@@ -58,7 +60,7 @@ hist(df$response.weighted)
 ########You need to center your competition variables to interpret chamber majorities
 describe(df$chamber.changes)
 describe(df$effective.party)
-describe(df$competition.lee.up)
+summary(df.working$competition.lee.up)
 
 df.working=df%>%
   mutate(capita.log=log(capita.income))%>%
@@ -74,22 +76,22 @@ df.working$competition.chambers.cent=scale(df.working$competition.chambers.up, s
 summary(df.working)
 summary(df.working$chamber.changes.cent)
 ###################Running basic models for weighted scores
-maj.chamber.shifts=lm(response.weighted~chamber.changes.cent+chamber.majorities+chamber.majorities*chamber.changes.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+maj.chamber.shifts=lm(response.weighted~chamber.changes.cent+chamber.majorities+chamber.majorities*chamber.changes.cent+polar+polar*chamber.changes.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
 analytics(maj.chamber.shifts)
 coeftest(maj.chamber.shifts, vcov = vcovHC(maj.chamber.shifts,type="HC1"))
 coeftest(maj.chamber.shifts, vcov = vcovHAC(maj.chamber.shifts))
 
-maj.effective=lm(response.weighted~effective.party.cent+chamber.majorities+chamber.majorities*effective.party.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+maj.effective=lm(response.weighted~effective.party.cent+chamber.majorities+chamber.majorities*effective.party.cent+polar+polar*effective.party.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
 analytics(maj.effective)
 coeftest(maj.effective, vcov = vcovHC(maj.effective,type="HC1"))
 coeftest(maj.effective, vcov = vcovHAC(maj.effective))
 
-maj.competitionlee=lm(response.weighted~competition.lee.cent+chamber.majorities+chamber.majorities*competition.lee.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+maj.competitionlee=lm(response.weighted~competition.lee.cent+chamber.majorities+chamber.majorities*competition.lee.cent+polar+polar*competition.lee.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
 analytics(maj.competitionlee)
 coeftest(maj.competitionlee, vcov = vcovHC(maj.competitionlee,type="HC1"))
 coeftest(maj.competitionlee, vcov = vcovHAC(maj.competitionlee))
 
-maj.competitionchambers=lm(response.weighted~competition.chambers.cent+chamber.majorities+chamber.majorities*competition.chambers.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+maj.competitionchambers=lm(response.weighted~competition.chambers.cent+chamber.majorities+chamber.majorities*competition.chambers.cent+polar+polar*competition.chambers.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
 analytics(maj.competitionchambers)
 coeftest(maj.competitionchambers, vcov = vcovHC(maj.competitionchambers,type="HC1"))
 coeftest(maj.competitionchambers, vcov = vcovHAC(maj.competitionchambers))
@@ -135,10 +137,11 @@ ggplot(panel.data,aes(x= reorder(state.postal,final.index),y=response.weighted,g
 ###Chamber Changes Plot
 summary(df.working)
 plottable.data = df.working %>%####Generate a mean variable list of the data table
-  dplyr::select(response.weighted,chamber.changes.cent,effective.party.cent,competition.lee.cent,competition.chambers.cent,chamber.majorities,gov_control,capita.log,operations.capita,health.donor.capita,year,chamber.changes,effective.party,competition.lee.up,competition.chambers.up)%>%
+  dplyr::select(response.weighted,chamber.changes.cent,effective.party.cent,competition.lee.cent,competition.chambers.cent,chamber.majorities,gov_control,capita.log,operations.capita,health.donor.capita,year,chamber.changes,effective.party,competition.lee.up,competition.chambers.up,polar)%>%
   mutate(capita.log=mean(capita.log,na.rm=TRUE))%>%
   mutate(operations.capita=mean(operations.capita,na.rm=TRUE))%>%
   mutate(health.donor.capita=mean(health.donor.capita,na.rm=TRUE))%>%
+  mutate(polar=mean(polar,na.rm=TRUE))%>%
   mutate(gov_control=0)%>%
   mutate(year=2014)
 
@@ -329,9 +332,45 @@ ggplot(chamberplot.data,aes(x= chamber.majorities, y=fit,group=class,color=class
 
 
 ##############Analysis for the appendix################
-maj.chamber.shifts.un=lm(response.unweighted~chamber.changes.cent+chamber.majorities+chamber.majorities*chamber.changes.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
-analytics(maj.chamber.shifts.un)
-  
+summary(df.working)
+#############testing for unweighted variable
+un.chamber.shifts=lm(response.unweighted~chamber.changes.cent+chamber.majorities+chamber.majorities*chamber.changes.cent+polar+polar*chamber.changes.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+analytics(un.chamber.shifts)
+coeftest(un.chamber.shifts, vcov = vcovHC(un.chamber.shifts,type="HC1"))
+coeftest(un.chamber.shifts, vcov = vcovHAC(un.chamber.shifts))
+
+un.effective=lm(response.unweighted~effective.party.cent+chamber.majorities+chamber.majorities*effective.party.cent+polar+polar*effective.party.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+analytics(un.effective)
+coeftest(un.effective, vcov = vcovHC(un.effective,type="HC1"))
+coeftest(un.effective, vcov = vcovHAC(un.effective))
+
+un.competitionlee=lm(response.unweighted~competition.lee.cent+chamber.majorities+chamber.majorities*competition.lee.cent+polar+polar*competition.lee.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+analytics(un.competitionlee)
+coeftest(un.competitionlee, vcov = vcovHC(un.competitionlee,type="HC1"))
+coeftest(un.competitionlee, vcov = vcovHAC(un.competitionlee))
+
+un.competitionchambers=lm(response.unweighted~competition.chambers.cent+chamber.majorities+chamber.majorities*competition.chambers.cent+polar+polar*competition.chambers.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
+analytics(un.competitionchambers)
+coeftest(un.competitionchambers, vcov = vcovHC(un.competitionchambers,type="HC1"))
+coeftest(un.competitionchambers, vcov = vcovHAC(un.competitionchambers))
+
+
+##########Testing for only expansion
+hist(df.working$expansion)
+chamber.expansion.glm=glm(expansion~chamber.changes.cent+chamber.majorities+chamber.majorities*chamber.changes.cent+polar+polar*chamber.changes.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),family=binomial(),data=df.working)
+summary(chamber.expansion.glm)
+
+effective.expansion.glm=glm(expansion~effective.party.cent+chamber.majorities+chamber.majorities*effective.party.cent+polar+polar*effective.party.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),family=binomial(),data=df.working)
+summary(effective.expansion.glm)
+
+lee.expansion.glm=glm(expansion~competition.lee.cent+chamber.majorities+chamber.majorities*competition.lee.cent+polar+polar*competition.lee.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),family=binomial(),data=df.working)
+summary(lee.expansion.glm)
+
+competition.expansion.glm=glm(expansion~competition.chambers.cent+chamber.majorities+chamber.majorities*competition.chambers.cent+polar+polar*competition.chambers.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),family=binomial(),data=df.working)
+summary(competition.expansion.glm)
+
+
+
 maj.effective.un=lm(response.unweighted~effective.party.cent+chamber.majorities+chamber.majorities*effective.party.cent+gov_control+capita.log+operations.capita+health.donor.capita+as.factor(year),data=df.working)
 analytics(maj.effective.un)
   
